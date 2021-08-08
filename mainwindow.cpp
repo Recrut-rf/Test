@@ -1,12 +1,10 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-
 #include <QXmlStreamReader>
 #include <QDebug>
 #include <QFile>
 #include <QFileDialog>
 #include <algorithm>
-#include <future>
 
 
 int MainWindow::W = 0;
@@ -19,19 +17,26 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    formWithPoints = new FormWithPoints((this->width() * 0.5), (this->height() * 0.5), this);
-    ui->verticalLayout->addWidget(formWithPoints);
+    formWithPoints_ = new FormWithPoints((this->width() * 0.5), (this->height() * 0.5), this);
+    ui->verticalLayout->addWidget(formWithPoints_);
 
     this->W = this->width();
     this->H = this->height();
 
     this->setWindowIconText("XML Loader");
     this->setWindowTitle("XML Loader");
+
+    loadBinaryData_ = nullptr;
+
+    pathToFile_ = qApp->applicationDirPath()+ "/iq_qam32.bin";
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+
+    if(loadBinaryData_)
+        delete loadBinaryData_;
 }
 
 void MainWindow::on_pushButtonXML_clicked()
@@ -78,58 +83,13 @@ void MainWindow::loadXml(QString fileName)
     }
 
     if(xml.hasError())
+    {
         qDebug() << "Error loading XML: " << xml.errorString();
-
-    file.close();
-
-    formWithPoints->setPoints(massX_, massY_);
-}
-
-bool MainWindow::loadBinaryData(QString fileName)
-{    
-    QFile file(fileName);
-
-    QDataStream stream(&file);
-    stream.setVersion (QDataStream::Qt_DefaultCompiledVersion);
-    qint8 tempVal = 0;
-
-    bool flag = false;
-    qint16 count = 0;
-
-    if(file.open(QIODevice::ReadOnly ))
-    {
-        while(!file.atEnd())
-        {
-            ++count;
-            stream >> tempVal;            
-
-            if(stream.status() != QDataStream::Ok)
-            {
-                qDebug() << "Error read data from binary file!";
-                return false;
-            }
-            else
-            {
-                if(!flag)
-                {
-                    valuesX.push_back(tempVal);
-                    flag = true;
-                }
-                else
-                {
-                    valuesY.push_back(tempVal);
-                    flag = false;
-                }
-            }
-        }
+        file.close();
+        return;
     }
-    else
-    {
-        qDebug() << "Error open binary file!";
-        return false;
-    }    
     file.close();
-    return true;
+    formWithPoints_->setPoints(massX_, massY_);
 }
 
 void MainWindow::wheelEvent(QWheelEvent *event)
@@ -141,10 +101,10 @@ void MainWindow::wheelEvent(QWheelEvent *event)
     w = this->width() + delta;
     h = this->height() + delta;
 
-    this->formWithPoints->~FormWithPoints();
-    formWithPoints = new FormWithPoints((w * 0.5), (h * 0.5), this);
+    this->formWithPoints_->~FormWithPoints();
+    formWithPoints_ = new FormWithPoints((w * 0.5), (h * 0.5), this);
 
-    ui->verticalLayout->addWidget(formWithPoints);
+    ui->verticalLayout->addWidget(formWithPoints_);
     loadXml(fileName);
 }
 
@@ -156,23 +116,66 @@ void MainWindow::paintEvent(QPaintEvent *event)
         return;
     else
     {
-        this->formWithPoints->~FormWithPoints();
-        formWithPoints = new FormWithPoints((this->width() * 0.5), (this->height() * 0.5), this);
+        this->formWithPoints_->~FormWithPoints();
+        formWithPoints_ = new FormWithPoints((this->width() * 0.5), (this->height() * 0.5), this);
 
-        ui->verticalLayout->addWidget(formWithPoints);
+        ui->verticalLayout->addWidget(formWithPoints_);
         loadXml(fileName);
 
-        formWithPoints->resize((this->width() * 0.5), this->height() * 0.5);
-        formWithPoints->show();
+        formWithPoints_->resize((this->width() * 0.5), this->height() * 0.5);
+        formWithPoints_->show();
     }
 }
 
 void MainWindow::on_pushButtonBinary_clicked()
 {
-    QString pathToFile = qApp->applicationDirPath()+ "/iq_qam32.bin";    
+    if(loadBinaryData_ == nullptr)
+    {
+        loadBinaryData_ = new LoadBinaryData();
+        this->moveToThread(&formThread_);
+        connect(&formThread_, &QThread::finished, formWithPoints_, &QObject::deleteLater);
+        connect(this, &MainWindow::startWork, loadBinaryData_, &LoadBinaryData::startWork);
+        connect(loadBinaryData_, &LoadBinaryData::threadStarted, this, &MainWindow::threadStarted, Qt::DirectConnection);
+        connect(loadBinaryData_, &LoadBinaryData::threadStoped, this, &MainWindow::threadStoped, Qt::DirectConnection);
+        connect(loadBinaryData_, &LoadBinaryData::loadBinaryFinished, this, &MainWindow::loadBinaryFinished, Qt::DirectConnection);
+        formThread_.start();
+        emit startWork();
+    }
+    else
+    {
+        connect(&formThread_, &QThread::finished, formWithPoints_, &QObject::deleteLater);
+        connect(this, &MainWindow::startWork, loadBinaryData_, &LoadBinaryData::startWork);
+        connect(loadBinaryData_, &LoadBinaryData::threadStarted, this, &MainWindow::threadStarted, Qt::DirectConnection);
+        connect(loadBinaryData_, &LoadBinaryData::threadStoped, this, &MainWindow::threadStoped, Qt::DirectConnection);
+        connect(loadBinaryData_, &LoadBinaryData::loadBinaryFinished, this, &MainWindow::loadBinaryFinished, Qt::DirectConnection);
+        emit startWork();
+    }
+}
 
-    auto f1 = std::async(std::launch::async, &MainWindow::loadBinaryData, this, pathToFile);
+void MainWindow::loadBinaryFinished(QVector<int16_t> valuesX, QVector<int16_t> valuesY)
+{
+    formWithPoints_->setBinaryPoints(valuesX, valuesY);
+}
 
-    if(f1.get())
-        formWithPoints->setBinaryPoints(valuesX, valuesY);
+void MainWindow::threadStarted()
+{
+    qDebug() << "Thread started!";
+}
+
+void MainWindow::threadStoped()
+{
+    formWithPoints_->setBinaryPoints(QVector<int16_t>(), QVector<int16_t>());
+    qDebug() << "Thread stoped!";
+
+    // если нужна постоянна работа, то расскоментировать строку ниже
+    // правда при этом возможны "зависания проги"
+    //emit startWork();
+}
+
+void MainWindow::on_closeButton_clicked()
+{
+    if(formThread_.isRunning())
+        formThread_.destroyed();
+
+    this->close();
 }
