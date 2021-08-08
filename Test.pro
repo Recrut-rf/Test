@@ -10,11 +10,13 @@ CONFIG += c++11
 
 SOURCES += \
     formwithpoints.cpp \
+    loadbinarydata.cpp \
     main.cpp \
     mainwindow.cpp
 
 HEADERS += \
     formwithpoints.h \
+    loadbinarydata.h \
     mainwindow.h
 
 FORMS += \
