@@ -19,7 +19,9 @@ public:
     ~FormWithPoints();
 
     void setPoints(QVector<double> massX, QVector<double> massY);
-    void setBinaryPoints(QVector<qint8> massX, QVector<qint8> massY);
+
+public slots:
+    void setBinaryPoints(QVector<int16_t> binaryMassX, QVector<int16_t> binaryMassY);
 
 private:
     Ui::FormWithPoints *ui;
@@ -32,9 +34,9 @@ private:
     // данные по Y из XML
     QVector<double> massY_;
     // данные по X из бинарного файла
-    QVector<qint8> binaryMassX_;
+    QVector<int16_t> binaryMassX_;
     // данные по Y из бинарного файла
-    QVector<qint8> binaryMassY_;
+    QVector<int16_t> binaryMassY_;
 
     // QWidget interface
 protected:
@@ -42,3 +44,4 @@ protected:
 };
 
 #endif // FORMWITHPOINTS_H
+
