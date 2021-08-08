@@ -30,10 +30,10 @@ void FormWithPoints::setPoints(QVector<double> massX, QVector<double> massY)
     this->repaint();
 }
 
-void FormWithPoints::setBinaryPoints(QVector<qint8> massX, QVector<qint8> massY)
+void FormWithPoints::setBinaryPoints(QVector<int16_t> binaryMassX, QVector<int16_t> binaryMassY)
 {
-    binaryMassX_ = massX;
-    binaryMassY_ = massY;
+    this->binaryMassX_ = binaryMassX;
+    this->binaryMassY_ = binaryMassY;
     this->repaint();
 }
 
@@ -70,6 +70,11 @@ void FormWithPoints::paintEvent(QPaintEvent *event)
        // рисуем крестик в нужную позицию
        painter.drawImage(QPointF(X, Y),image);
     }
+    if(massX_.size() == 0)
+    {
+        painter.setPen(QPen(Qt::white, 1) );
+        painter.drawPoint(QPointF(0, 0));
+    }
 
     painter.setPen(QPen(Qt::red, 2) );
 
@@ -85,15 +90,19 @@ void FormWithPoints::paintEvent(QPaintEvent *event)
     hxInt = max_xInt - min_xInt;
     hyInt = max_yInt - min_yInt;
 
-    for (int i = 0; i < binaryMassX_.size() / 16000; ++i)
+    for (int i = 0; i < binaryMassX_.size() /*/ 16000*/; ++i)
     {
-       for(int j = 0; j < 16000; ++j)
-       {
-           // перевод абсолютных значений в относительные
-          qreal X = (binaryMassX_[j] - min_xInt) * width_ / hxInt + 0.5;
-          qreal Y = (binaryMassY_[j] - min_yInt) * height_ / hyInt + 0.5;
-          // рисуем крестик в нужную позицию
-          painter.drawPoint(QPoint(X, Y));
-       }
+        // перевод абсолютных значений в относительные
+       qreal X = (binaryMassX_[i] - min_xInt) * width_ / hxInt + 0.5;
+       qreal Y = (binaryMassY_[i] - min_yInt) * height_ / hyInt + 0.5;
+       // рисуем крестик в нужную позицию
+       painter.drawPoint(QPoint(X, Y));
     }
+    if(binaryMassX_.size() == 0)
+    {
+        painter.setPen(QPen(Qt::white, 1) );
+        painter.drawPoint(QPoint(0, 0));
+    }
+
 }
+
