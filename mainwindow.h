@@ -4,7 +4,9 @@
 #include <QMainWindow>
 #include <QVector>
 #include <QWheelEvent>
+#include <QThread>
 #include "formwithpoints.h"
+#include "loadbinarydata.h"
 
 
 QT_BEGIN_NAMESPACE
@@ -19,23 +21,34 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+signals:
+    void startWork();
+
+
 private slots:
     void on_pushButtonXML_clicked();
-
     void on_pushButtonBinary_clicked();
+
+    void loadBinaryFinished(QVector<int16_t> valuesX, QVector<int16_t> valuesY);
+
+    void threadStarted();
+    void threadStoped();
+
+    void on_closeButton_clicked();
 
 private:
     Ui::MainWindow *ui;
 
-    FormWithPoints *formWithPoints;
+    FormWithPoints *formWithPoints_ = nullptr;
 
     // коллекция координат X
     QVector<double> massX_;
     // коллекция координат Y
     QVector<double> massY_;
 
-    QVector<qint8> valuesX;
-    QVector<qint8> valuesY;
+    LoadBinaryData *loadBinaryData_;
+
+    QThread formThread_;
 
     // для ширины
     static int W;
@@ -44,12 +57,10 @@ private:
 
     // название файла
     static QString fileName;
+    QString pathToFile_{};
 
     // загрузить данные из xml файла
     void loadXml(QString fileName);
-    // загрузить данные из бинарного файла
-    bool loadBinaryData(QString fileName);
-
 
     // QWidget interface
 protected:
@@ -59,3 +70,4 @@ protected:
     void paintEvent(QPaintEvent *event);
 };
 #endif // MAINWINDOW_H
+
